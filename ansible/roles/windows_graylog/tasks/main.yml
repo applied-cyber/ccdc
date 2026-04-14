@@ -1,0 +1,28 @@
+- name: Transfer files
+  ansible.windows.win_copy:
+    src: "{{ item }}"
+    dest: "{{ windows_temp_dir }}"
+  with_items:
+    - nxlog-ce-3.1.2319.msi
+    - sysmonconfig-export.xml
+    - Sysmon64.exe
+
+- name: Install sysmon w/ swiftonsecurity
+  ansible.windows.win_command: "{{ windows_temp_dir }}\\Sysmon64.exe -accepteula -i {{ windows_temp_dir }}\\sysmonconfig-export.xml"
+
+- name: Install nxlog
+  win_package:
+    path: "{{ windows_temp_dir }}\\nxlog-ce-3.1.2319.msi"
+    wait: yes
+
+- name: Install nxlog config
+  ansible.windows.win_template:
+    src: nxlog.conf.j2
+    dest: "C:\\Program Files\\nxlog\\conf\\nxlog.conf"
+
+- name: Restart nxlog
+  ansible.windows.win_service:
+    name: nxlog
+    state: restarted
+
+# turn on powershell logging?

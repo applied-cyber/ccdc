@@ -1,0 +1,42 @@
+- name: Retrieve users with a login shell (excluding root, osogof, ccdcadmin)
+  shell: cat /etc/passwd | grep sh$ | cut -d ":" -f 1 | grep -v root | grep -v osogof | grep -v ccdcadmin
+  register: shell_users
+  changed_when: false
+
+- name: Fail if no users found to force-command
+  assert:
+    that:
+      - shell_users.stdout_lines | length > 0
+    fail_msg: "No users with login shells found (after excluding root, osogof, ccdcadmin). Nothing to do."
+
+- name: Copy esh binary to /usr/local/bin/esh
+  copy:
+    src: esh
+    dest: /usr/local/bin/esh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Remove any existing ForceCommand Match block managed by us
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} MANAGED BY ANSIBLE - service_ssh_secure_shell"
+    state: absent
+
+- name: Add Match block with ForceCommand for scored SSH users
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} MANAGED BY ANSIBLE - service_ssh_secure_shell"
+    block: |
+      Match User {{ shell_users.stdout_lines | join(',') }}
+          ForceCommand /usr/local/bin/esh
+    insertafter: EOF
+
+- name: Validate sshd config
+  command: sshd -t
+  changed_when: false
+
+- name: Restart sshd
+  service:
+    name: sshd
+    state: restarted

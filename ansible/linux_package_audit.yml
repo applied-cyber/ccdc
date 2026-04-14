@@ -1,0 +1,45 @@
+- name: Linux Package Audit (audit)
+  hosts: linux
+  gather_facts: no
+  vars_files:
+    - vars/management.yml
+  pre_tasks:
+    - name: Check that audit binary exists locally
+      delegate_to: localhost
+      stat:
+        path: "{{ playbook_dir }}/roles/linux_package_audit/files/audit"
+      register: audit_stat
+      run_once: true
+
+    - name: Fail if audit binary is missing
+      assert:
+        that:
+          - audit_stat.stat.exists
+        fail_msg: >
+          audit binary not found at roles/linux_package_audit/files/audit.
+          Build it and place it there before running this playbook.
+      run_once: true
+
+    - name: Require custom sshd on port 50000
+      assert:
+        that:
+          - ansible_port | default(ansible_ssh_port) | default(22) | int == 50000
+        fail_msg: >
+          audit requires custom sshd on port 50000.
+          Deploy custom sshd first, then set ansible_ssh_port=50000 in inventory.
+
+    - name: Confirm custom sshd is deployed
+      pause:
+        prompt: "Custom sshd is deployed and ansible is connecting on port 50000? (yes/no)"
+      register: sshd_confirm
+      run_once: true
+      when: skip_confirm is not defined
+
+    - name: Abort if not confirmed
+      fail:
+        msg: "Aborted: custom sshd must be deployed before audit."
+      when: skip_confirm is not defined and sshd_confirm.user_input | lower != 'yes'
+      run_once: true
+
+  roles:
+    - {role: linux_package_audit, ignore_errors: yes}

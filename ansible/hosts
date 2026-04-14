@@ -1,0 +1,23 @@
+[linux]
+# hostname ansible_host=192.168.100.100 scored_ports=22,80
+
+[linux:vars]
+ansible_user=newccdcadmin
+ansible_connection=ssh
+# Uncomment after deploying hossh
+#ansible_ssh_port=50000
+
+[bsd]
+# hostname ansible_host=192.168.100.100 scored_ports=22,80
+
+[bsd:vars]
+ansible_user=newccdcadmin
+ansible_connection=ssh
+
+[windows]
+# hostname ansible_host=192.168.100.100 scored_ports=22,3389
+
+[windows:vars]
+ansible_user=newccdcadmin
+ansible_connection=ssh
+ansible_shell_type=powershell

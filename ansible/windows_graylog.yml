@@ -1,0 +1,17 @@
+- name: Windows Graylog
+  hosts: windows
+  gather_facts: no
+  vars_files:
+    - vars/management.yml
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - windows_temp_dir is defined
+        fail_msg: >
+          Missing required variable: windows_temp_dir.
+          Make sure vars/management.yml is populated.
+      ignore_errors: no
+      run_once: true
+  roles:
+    - {role: windows_graylog, ignore_errors: yes}

@@ -1,0 +1,431 @@
+- name: Delete all shares
+  ansible.windows.win_share:
+    name: "{{ item }}"
+    state: absent
+  with_items:
+    - C
+    - D
+    - ADMIN
+
+- name: Set registry hardening keys
+  ansible.windows.win_regedit:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: "{{ item.type }}"
+  with_items:
+    # Force NLA for RDP
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp"
+      name: UserAuthentication
+      data: 1
+      type: dword
+
+    # Disable SMB1 (EternalBlue)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: SMB1
+      data: 0
+      type: dword
+
+    # Disable SMBv1 client
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\mrxsmb10"
+      name: Start
+      data: 4
+      type: dword
+
+    # Disable NetBIOS over TCP/IP
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\NetBT\\Parameters"
+      name: NetbiosOptions
+      data: 2
+      type: dword
+
+    # Disable WinRM
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WinRM\\Service"
+      name: AllowAutoConfig
+      data: 0
+      type: dword
+
+    # Disable psexec
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\psexec.exe"
+      name: Debugger
+      data: svchost.exe
+      type: string
+
+    # Enable UAC
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\policies\\system"
+      name: EnableLUA
+      data: 1
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\policies\\system"
+      name: ConsentPromptBehaviorAdmin
+      data: 5
+      type: dword
+
+    # Disable remote SCM
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control"
+      name: DisableRemoteScmEndpoints
+      data: 1
+      type: dword
+
+    # Force firewall on - Domain profile
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\DomainProfile"
+      name: EnableFirewall
+      data: 1
+      type: dword
+
+    # Force firewall on - Standard profile
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\StandardProfile"
+      name: EnableFirewall
+      data: 1
+      type: dword
+
+    # Force firewall on - Public profile
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\PublicProfile"
+      name: EnableFirewall
+      data: 1
+      type: dword
+
+    # Disable multicast name resolution (LLMNR)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient"
+      name: EnableMulticast
+      data: 0
+      type: dword
+
+    # Disable NBNS (NetBIOS Name Service)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters"
+      name: EnableMDNS
+      data: 0
+      type: dword
+
+    # Disable WPAD
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\WinHttpAutoProxySvc"
+      name: Start
+      data: 4
+      type: dword
+
+    # Disable remote registry
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\RemoteRegistry"
+      name: Start
+      data: 4
+      type: dword
+
+    # Disable WSH (Windows Script Host)
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows Script Host\\Settings"
+      name: Enabled
+      data: 0
+      type: dword
+
+    # Disable AutoRun
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"
+      name: NoDriveTypeAutoRun
+      data: 255
+      type: dword
+
+    # Restrict anonymous access
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: RestrictAnonymous
+      data: 2
+      type: dword
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: RestrictAnonymousSAM
+      data: 1
+      type: dword
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: EveryoneIncludesAnonymous
+      data: 0
+      type: dword
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: RestrictNullSessAccess
+      data: 1
+      type: dword
+
+    # Disable admin share auto-recreation
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: AutoShareWks
+      data: 0
+      type: dword
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: AutoShareServer
+      data: 0
+      type: dword
+
+    # Disable WDigest plaintext credential caching
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest"
+      name: UseLogonCredential
+      data: 0
+      type: dword
+
+    # LSA protection, UEFI-locked (requires reboot)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: RunAsPPL
+      data: 2
+      type: dword
+
+    # Disable cached logon credentials
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+      name: CachedLogonsCount
+      data: 0
+      type: string
+
+    # Require SMB signing - server
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: RequireSecuritySignature
+      data: 1
+      type: dword
+
+    # Require SMB signing - client
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters"
+      name: RequireSecuritySignature
+      data: 1
+      type: dword
+
+    # SmbGhost no compression
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: DisableCompression
+      data: 1
+      type: dword
+
+    # Clear pagefile on shutdown
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management"
+      name: ClearPageFileAtShutdown
+      data: 1
+      type: dword
+
+    # UAC require credential entry
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\policies\\system"
+      name: ConsentPromptBehaviorAdmin
+      data: 2
+      type: dword
+
+    # Force NTLMv2 only, refuse LM/NTLMv1
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: LmCompatibilityLevel
+      data: 5
+      type: dword
+
+    # Disable Windows Remote Shell (WinRS)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WinRM\\Service\\WinRS"
+      name: AllowRemoteShellAccess
+      data: 0
+      type: dword
+
+    # Enable PowerShell script block logging
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging"
+      name: EnableScriptBlockLogging
+      data: 1
+      type: dword
+
+    # Safe DLL search order (anti-DLL sideloading)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+      name: SafeDllSearchMode
+      data: 1
+      type: dword
+
+    # Do not store LM hash of passwords
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: NoLMHash
+      data: 1
+      type: dword
+
+    # Block insecure guest auth on SMB client
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\LanmanWorkstation"
+      name: AllowInsecureGuestAuth
+      data: 0
+      type: dword
+
+    # Block outgoing NTLM authentication (prevents NTLM relay)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\MSV1_0"
+      name: RestrictSendingNTLMTraffic
+      data: 2
+      type: dword
+
+    # Audit inbound NTLM (1=audit only since services might need NTLM, e.g. no SPN registration)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\MSV1_0"
+      name: RestrictReceivingNTLMTraffic
+      data: 1
+      type: dword
+
+    # Prevent storing domain credentials in Credential Manager
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: DisableDomainCreds
+      data: 1
+      type: dword
+
+    # Require LDAP client signing (prevents unsigned LDAP relay)
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\ldap"
+      name: LDAPClientIntegrity
+      data: 2
+      type: dword
+
+    # prevent MSI privilege escalation
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer"
+      name: AlwaysInstallElevated
+      data: 0
+      type: dword
+    - path: "HKCU:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer"
+      name: AlwaysInstallElevated
+      data: 0
+      type: dword
+
+    # CredSSP / BlueKeep 
+    - path: "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\CredSSP\\Parameters"
+      name: AllowEncryptionOracle
+      data: 0
+      type: dword
+
+    # RDP restricted admin mode, prevents pass-the-hash via RDP
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa"
+      name: DisableRestrictedAdmin
+      data: 0
+      type: dword
+  ignore_errors: true
+
+- name: Clear null session pipes and shares
+  ansible.windows.win_regedit:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+    data: ""
+    type: multistring
+  with_items:
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: NullSessionPipes
+    - path: "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters"
+      name: NullSessionShares
+  ignore_errors: true
+
+- name: Get NetBIOS interfaces
+  ansible.windows.win_reg_stat:
+    path: HKLM:\SYSTEM\CurrentControlSet\Services\NetBT\Parameters\Interfaces\
+  register: netbt_interfaces
+  ignore_errors: true
+
+- name: Disable NetBIOS on all interfaces
+  ansible.windows.win_regedit:
+    path: "HKLM:\\SYSTEM\\CurrentControlSet\\services\\NetBT\\Parameters\\Interfaces\\{{ item }}"
+    name: NetbiosOptions
+    data: 2
+    type: dword
+  loop: "{{ netbt_interfaces.sub_keys | default([]) }}"
+  ignore_errors: true
+
+- name: Disable PowerShell v2
+  ansible.windows.win_shell: |
+    Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart -ErrorAction SilentlyContinue
+    Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2 -NoRestart -ErrorAction SilentlyContinue
+  ignore_errors: true
+
+- name: Delete UserInitMprLogonScript
+  ansible.windows.win_regedit:
+    path: "HKCU:\\Environment"
+    name: "UserInitMprLogonScript"
+    state: absent
+
+- name: Clear run and run once registry keys
+  ansible.windows.win_regedit:
+    path: "{{ item.path }}"
+    state: absent
+    delete_key: no
+  with_items:
+    - path: "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    - path: "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+    - path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+    - path: "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce"
+
+- name: Disable guest user
+  ansible.windows.win_user:
+    name: Guest
+    account_disabled: yes
+
+- name: Remove all users from Remote Desktop Users group
+  ansible.windows.win_shell: |
+    $members = Get-LocalGroupMember -Group "Remote Desktop Users" -ErrorAction SilentlyContinue
+    foreach ($member in $members) {
+      Remove-LocalGroupMember -Group "Remote Desktop Users" -Member $member.SID -ErrorAction SilentlyContinue
+    }
+  ignore_errors: true
+
+- name: Remove all users from Remote Management Users group
+  ansible.windows.win_shell: |
+    $members = Get-LocalGroupMember -Group "Remote Management Users" -ErrorAction SilentlyContinue
+    foreach ($member in $members) {
+      Remove-LocalGroupMember -Group "Remote Management Users" -Member $member.SID -ErrorAction SilentlyContinue
+    }
+  ignore_errors: true
+
+- name: Delete powerautomate
+  ansible.windows.win_file:
+    path: "C:\\Program Files (x86)\\Microsoft UI flows"
+    state: absent
+
+- name: Disable dangerous services
+  ansible.windows.win_service:
+    name: "{{ item }}"
+    start_mode: disabled
+    state: stopped
+  loop:
+    - spooler
+    - CertSvc
+  ignore_errors: true
+
+- name: Disable WinRM service
+  ansible.windows.win_service:
+    name: WinRM
+    start_mode: disabled
+    state: stopped
+  ignore_errors: true
+
+- name: Remove ms-msdt protocol handler (Follina CVE-2022-30190)
+  ansible.windows.win_shell: |
+    Remove-Item -Path "HKLM:\SOFTWARE\Classes\ms-msdt" -Recurse -Force -ErrorAction SilentlyContinue
+  ignore_errors: true
+
+- name: Fix SAM/SYSTEM hive ACLs (HiveNightmare CVE-2021-36934)
+  ansible.windows.win_shell: |
+    icacls C:\Windows\System32\config\SAM /inheritance:e /grant "BUILTIN\Administrators:F" /grant "NT AUTHORITY\SYSTEM:F" /remove "BUILTIN\Users" 2>$null
+    icacls C:\Windows\System32\config\SECURITY /inheritance:e /grant "BUILTIN\Administrators:F" /grant "NT AUTHORITY\SYSTEM:F" /remove "BUILTIN\Users" 2>$null
+    icacls C:\Windows\System32\config\SYSTEM /inheritance:e /grant "BUILTIN\Administrators:F" /grant "NT AUTHORITY\SYSTEM:F" /remove "BUILTIN\Users" 2>$null
+  ignore_errors: true
+
+- name: Delete VSS shadow copies (HiveNightmare mitigation)
+  ansible.windows.win_shell: |
+    vssadmin delete shadows /all /quiet 2>$null
+  ignore_errors: true
+
+- name: Disable EFS service (PetitPotam CVE-2021-36942)
+  ansible.windows.win_service:
+    name: EFS
+    start_mode: disabled
+    state: stopped
+  ignore_errors: true
+
+- name: Take ownership of sticky keys files
+  ansible.windows.win_owner:
+    path: "{{ item }}"
+    user: Administrator
+  loop: "{{ STICKY_KEYS_FILES }}"
+
+- name: Allow Administrator to write to sticky keys files
+  ansible.windows.win_acl:
+    path: "{{ item }}"
+    user: Administrator
+    rights: FullControl
+    type: allow
+  loop: "{{ STICKY_KEYS_FILES }}"
+
+- name: Delete sticky keys files
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ STICKY_KEYS_FILES }}"
+
+- name: Enable full audit policy
+  ansible.windows.win_shell: |
+    auditpol /set /category:* /failure:enable /success:enable
+  ignore_errors: true
+
+- name: Disable all scheduled tasks
+  ansible.windows.win_shell: |
+    Get-ScheduledTask | Where-Object { $_.State -ne 'Disabled' } | Disable-ScheduledTask
+  become: true
+  become_method: runas
+  become_user: SYSTEM
+  ignore_errors: true

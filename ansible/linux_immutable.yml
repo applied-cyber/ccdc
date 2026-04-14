@@ -1,0 +1,6 @@
+- name: Linux immutable
+  hosts: linux
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  roles:
+    - {role: linux_immutable, ignore_errors: yes}

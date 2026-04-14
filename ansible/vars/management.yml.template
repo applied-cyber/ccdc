@@ -1,0 +1,23 @@
+# Name of your organization
+organization:
+
+# Network topology
+
+# Fixed assets
+management_server:
+graylog_ip: "{{ management_server }}"
+graylog_port: 1514
+graylog_windows_port: 12201
+
+# host directory management
+host_files: "./client_files"
+
+# constants
+linux_breakglass_dir:
+linux_breakglass_bin:
+linux_root_bin: "/root/.local/bin"
+linux_paths:
+  - "{{ linux_breakglass_dir }}"
+  - "{{ linux_root_bin }}"
+
+windows_temp_dir: "C:\\Users\\Administrator\\AppData\\Local\\Temp"

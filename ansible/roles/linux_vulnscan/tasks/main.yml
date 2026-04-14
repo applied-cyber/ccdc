@@ -1,0 +1,191 @@
+### KERNEL VULNERABILITY CHECKS ###
+
+- name: Parse kernel version
+  set_fact:
+    kernel_major: "{{ ansible_kernel.split('.')[0] | int }}"
+    kernel_minor: "{{ ansible_kernel.split('.')[1] | int }}"
+    kernel_patch: "{{ ansible_kernel.split('.')[2].split('-')[0] | int }}"
+    is_rhel_kernel: "{{ ansible_kernel is search('\\.el') }}"
+    # RHEL build number: e.g. 5.14.0-362.24.1.el9 -> 362
+    rhel_build: "{{ ansible_kernel.split('-')[1].split('.')[0] | int if (ansible_kernel is search('\\.el') and '-' in ansible_kernel) else 0 }}"
+
+# DirtyPipe: CVE-2022-0847
+# Affected upstream: 5.8-5.10.101, 5.11-5.14 (EOL), 5.15.0-5.15.24, 5.16.0-5.16.10
+# RHEL 9 (5.14.0-xx.el9): fixed in 5.14.0-70.5.1.el9_0, so build >= 71 is safe
+# RHEL 8 (4.18.0-xx.el8): not affected (kernel < 5.8)
+- name: Check for DirtyPipe (CVE-2022-0847)
+  set_fact:
+    dirtypipe_vulnerable: >-
+      {{
+        (is_rhel_kernel | bool and kernel_major | int == 5 and kernel_minor | int == 14 and rhel_build | int < 71) or
+        (not (is_rhel_kernel | bool) and (
+          (kernel_major | int == 5 and kernel_minor | int >= 8 and kernel_minor | int <= 9) or
+          (kernel_major | int == 5 and kernel_minor | int == 10 and kernel_patch | int < 102) or
+          (kernel_major | int == 5 and kernel_minor | int >= 11 and kernel_minor | int <= 14) or
+          (kernel_major | int == 5 and kernel_minor | int == 15 and kernel_patch | int < 25) or
+          (kernel_major | int == 5 and kernel_minor | int == 16 and kernel_patch | int < 11)
+        ))
+      }}
+
+- name: "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  debug:
+    msg: |
+      ########################################################################
+      ########################################################################
+      ###                                                                  ###
+      ###   CRITICAL: DIRTYPIPE VULNERABLE (CVE-2022-0847)                 ###
+      ###   KERNEL: {{ ansible_kernel }}
+      ###   TRIVIAL LOCAL ROOT EXPLOIT - PATCH IMMEDIATELY                 ###
+      ###                                                                  ###
+      ########################################################################
+      ########################################################################
+  when: dirtypipe_vulnerable | bool
+
+# DirtyCow: CVE-2016-5195, affects upstream kernels < 4.8.3
+# RHEL 7 (3.10.0-xx.el7): fixed in build 514+
+# RHEL 6 (2.6.32-xx.el6): fixed in build 643+
+# RHEL 8+ not affected (kernel >= 4.18, post-fix)
+- name: Check for DirtyCow (CVE-2016-5195)
+  set_fact:
+    dirtycow_vulnerable: >-
+      {{
+        (is_rhel_kernel | bool and kernel_major | int == 3 and kernel_minor | int == 10 and rhel_build | int < 514) or
+        (is_rhel_kernel | bool and kernel_major | int == 2 and rhel_build | int < 643) or
+        (not (is_rhel_kernel | bool) and (
+          (kernel_major | int < 4) or
+          (kernel_major | int == 4 and kernel_minor | int < 8) or
+          (kernel_major | int == 4 and kernel_minor | int == 8 and kernel_patch | int < 3)
+        ))
+      }}
+
+- name: "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  debug:
+    msg: |
+      ########################################################################
+      ########################################################################
+      ###                                                                  ###
+      ###   CRITICAL: DIRTYCOW VULNERABLE (CVE-2016-5195)                  ###
+      ###   KERNEL: {{ ansible_kernel }}
+      ###   TRIVIAL LOCAL ROOT EXPLOIT - PATCH IMMEDIATELY                 ###
+      ###                                                                  ###
+      ########################################################################
+      ########################################################################
+  when: dirtycow_vulnerable | bool
+
+### UID 0 ACCOUNT AUDIT ###
+
+- name: Find unauthorized UID 0 accounts
+  shell: "awk -F: '$3 == 0 { print $1 }' /etc/passwd"
+  register: uid0_users
+  changed_when: false
+
+- name: Filter to unexpected UID 0 accounts
+  set_fact:
+    rogue_uid0: "{{ uid0_users.stdout_lines | reject('match', '^root$') | reject('search', 'osogof') | reject('search', 'ccdcadmin') | list }}"
+
+- name: "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  debug:
+    msg: |
+      ########################################################################
+      ###                                                                  ###
+      ###   WARNING: UNAUTHORIZED UID 0 ACCOUNTS FOUND                     ###
+      ###   {{ rogue_uid0 | join(', ') }}
+      ###                                                                  ###
+      ########################################################################
+  when: rogue_uid0 | length > 0
+
+### SUID BINARY SCAN ###
+
+- name: Find all SUID binaries
+  shell: find / -xdev -perm -4000 -type f 2>/dev/null
+  register: suid_binaries
+  changed_when: false
+
+- name: Report SUID binaries
+  debug:
+    msg: "SUID binaries found: {{ suid_binaries.stdout_lines }}"
+  when: suid_binaries.stdout_lines | length > 0
+
+- name: No SUID binaries found
+  debug:
+    msg: "OK: No SUID binaries found"
+  when: suid_binaries.stdout_lines | length == 0
+
+### CAPABILITIES SCAN ###
+
+- name: Find all binaries with capabilities
+  shell: getcap -r / 2>/dev/null || true
+  register: cap_binaries
+  changed_when: false
+
+- name: Report binaries with capabilities
+  debug:
+    msg: "Binaries with capabilities: {{ cap_binaries.stdout_lines }}"
+  when: cap_binaries.stdout_lines | length > 0
+
+- name: No capabilities found
+  debug:
+    msg: "OK: No binaries with capabilities found"
+  when: cap_binaries.stdout_lines | length == 0
+
+### PERMISSIONS AUDIT ###
+
+- name: Check for world-writable system directories
+  shell: find /etc /usr /var/log -xdev -type d -perm -0002 2>/dev/null || true
+  register: world_writable_dirs
+  changed_when: false
+
+- name: Report world-writable system directories
+  debug:
+    msg: "WARNING: World-writable directories: {{ world_writable_dirs.stdout_lines }}"
+  when: world_writable_dirs.stdout_lines | length > 0
+
+- name: Check /etc/shadow permissions
+  stat:
+    path: /etc/shadow
+  register: shadow_stat
+
+- name: Report bad /etc/shadow permissions
+  debug:
+    msg: "WARNING: /etc/shadow is world-readable! Mode: {{ shadow_stat.stat.mode }}"
+  when: shadow_stat.stat.exists and shadow_stat.stat.mode[-1:] != '0'
+
+- name: Check /etc/passwd permissions
+  stat:
+    path: /etc/passwd
+  register: passwd_stat
+
+- name: Report writable /etc/passwd
+  debug:
+    msg: "WARNING: /etc/passwd is world-writable! Mode: {{ passwd_stat.stat.mode }}"
+  when: passwd_stat.stat.exists and passwd_stat.stat.woth | default(false)
+
+- name: Check for world-writable files in PATH directories
+  shell: find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -xdev -type f -perm -0002 2>/dev/null || true
+  register: writable_path_files
+  changed_when: false
+
+- name: Report world-writable files in PATH
+  debug:
+    msg: "WARNING: World-writable files in PATH: {{ writable_path_files.stdout_lines }}"
+  when: writable_path_files.stdout_lines | length > 0
+
+- name: Check for world-writable cron directories
+  shell: find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly -xdev -type f -perm -0002 2>/dev/null || true
+  register: writable_cron_files
+  changed_when: false
+
+- name: Report world-writable cron files
+  debug:
+    msg: "WARNING: World-writable cron files: {{ writable_cron_files.stdout_lines }}"
+  when: writable_cron_files.stdout_lines | length > 0
+
+- name: Check /root/.ssh permissions
+  stat:
+    path: /root/.ssh
+  register: root_ssh_stat
+
+- name: Report bad /root/.ssh permissions
+  debug:
+    msg: "WARNING: /root/.ssh has bad permissions! Mode: {{ root_ssh_stat.stat.mode }}"
+  when: root_ssh_stat.stat.exists and root_ssh_stat.stat.mode != '0700'

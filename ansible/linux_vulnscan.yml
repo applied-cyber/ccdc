@@ -1,0 +1,7 @@
+- name: Linux Vulnerability Scan (READ ONLY)
+  hosts: linux
+  gather_facts: yes
+  vars_files:
+    - vars/management.yml
+  roles:
+    - {role: linux_vulnscan}

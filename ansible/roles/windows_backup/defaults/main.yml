@@ -1,0 +1,6 @@
+REGS:
+  - HKLM
+  - HKCR
+  - HKCU
+  - HKU
+  - HKCC

@@ -1,0 +1,10 @@
+- name: Windows Everything Except Cred Rolls and Breakglass
+  hosts: windows
+  gather_facts: no
+  vars_files:
+    - vars/management.yml
+  roles:
+    - {role: windows_backup, ignore_errors: yes}
+    - {role: windows_harden, ignore_errors: yes}
+    - {role: windows_graylog, ignore_errors: yes}
+    - {role: windows_update, ignore_errors: yes}

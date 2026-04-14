@@ -1,0 +1,404 @@
+---
+# All binaries audit can impersonate.  If a binary exists on the target,
+# it is moved to /root/.local/bin (preserving symlink chains) and replaced
+# with a symlink to /usr/local/bin/audit.
+#
+# The order matters: move everything first, THEN create symlinks, so that
+# relative symlinks between binaries (e.g. iptables -> iptables-nft) are
+# preserved intact inside the backup directory.
+#
+# On modern distros /bin -> /usr/bin and /sbin -> /usr/sbin, so we just
+# search /usr/bin and /usr/sbin.  The symlinks from /bin and /sbin still
+# resolve through to our audit symlinks automatically.
+
+- name: Define audit binary list
+  set_fact:
+    audit_binaries:
+      # privilege escalation
+      - sudo
+      - sudoedit
+      - su
+      - visudo
+      - doas
+      - pkexec
+      # editors
+      - vim
+      - vi
+      - nvim
+      - nano
+      - pico
+      - emacs
+      # interpreted languages
+      - perl
+      - python
+      - python2
+      - python3
+      - python3.10
+      - python3.11
+      - python3.12
+      - python3.13
+      # network
+      - curl
+      - wget
+      - nc
+      - netcat
+      - socat
+      - telnet
+      - ssh
+      - scp
+      - ftp
+      - ss
+      - ip
+      - socket
+      - arp
+      - ping
+      - ping6
+      # firewall
+      - iptables
+      - iptables-nft
+      - ip6tables
+      - ip6tables-nft
+      - iptables-legacy
+      - ip6tables-legacy
+      - iptables-save
+      - iptables-nft-save
+      - ip6tables-save
+      - ip6tables-nft-save
+      - iptables-legacy-save
+      - ip6tables-legacy-save
+      - iptables-restore
+      - iptables-nft-restore
+      - ip6tables-restore
+      - ip6tables-nft-restore
+      - iptables-legacy-restore
+      - ip6tables-legacy-restore
+      - nft
+      - ebtables
+      - ebtables-nft
+      - arptables
+      - arptables-nft
+      # compilers and build tools
+      - g++
+      - gcc
+      - cc
+      - c89
+      - c99
+      - clang
+      - clang++
+      - make
+      - gmake
+      - cmake
+      - cmake3
+      - ld
+      # autotools
+      - autoconf
+      - autoheader
+      - autoreconf
+      - aclocal
+      - libtoolize
+      - libtool
+      - automake
+      - autom4te
+      - autoscan
+      - autoupdate
+      - ifnames
+      # text processing
+      - awk
+      - gawk
+      - mawk
+      - nawk
+      - sed
+      - gsed
+      - grep
+      - fgrep
+      - egrep
+      - cat
+      - cut
+      - xargs
+      - find
+      - head
+      - tail
+      - sort
+      - uniq
+      - wc
+      - tr
+      - tee
+      - tac
+      - rev
+      - nl
+      - paste
+      - expand
+      - unexpand
+      - fold
+      - fmt
+      - comm
+      - join
+      - column
+      - colrm
+      - strings
+      - base64
+      - md5sum
+      - sha1sum
+      - sha224sum
+      - sha256sum
+      - sha384sum
+      - sha512sum
+      - b2sum
+      - cksum
+      - sum
+      # coreutils file operations
+      - cp
+      - mv
+      - rm
+      - unlink
+      - ln
+      - link
+      - chmod
+      - chown
+      - shred
+      - file
+      - ls
+      - dir
+      - vdir
+      - touch
+      - mkdir
+      - rmdir
+      - install
+      - mktemp
+      - stat
+      - readlink
+      - realpath
+      - basename
+      - dirname
+      - split
+      - csplit
+      # coreutils basic
+      - echo
+      - printf
+      - "true"
+      - "false"
+      - "yes"
+      - seq
+      - test
+      - "["
+      - expr
+      - sleep
+      - env
+      - printenv
+      - uname
+      - hostname
+      - tty
+      - nproc
+      - arch
+      - pwd
+      - clear
+      - reset
+      - sync
+      - logname
+      - users
+      - groups
+      # process management
+      - kill
+      - pkill
+      - pgrep
+      - killall
+      - nohup
+      - timeout
+      - ps
+      - top
+      - htop
+      - w
+      - who
+      - uptime
+      - last
+      - watch
+      # system tools
+      - dd
+      - lsattr
+      - chattr
+      - whoami
+      - id
+      - cron
+      - mkfifo
+      - date
+      - dmesg
+      - sysctl
+      - ldd
+      - busybox
+      - docker
+      - podman
+      - gdb
+      - systemctl
+      - service
+      - getcap
+      - setcap
+      - df
+      - du
+      - free
+      - mount
+      - umount
+      - lsblk
+      - fdisk
+      - blkid
+      - parted
+      - lscpu
+      - lspci
+      - lsusb
+      - dmidecode
+      - chroot
+      # archive and compression
+      - tar
+      - gzip
+      - gunzip
+      - zcat
+      - bzip2
+      - bunzip2
+      - bzcat
+      - xz
+      - unxz
+      - xzcat
+      - lzma
+      - unlzma
+      - zstd
+      - unzstd
+      - zip
+      - unzip
+      # debugging
+      - strace
+      - ltrace
+      - hexdump
+      - xxd
+      - od
+      - objdump
+      - nm
+      - readelf
+      # diff/patch
+      - diff
+      - cmp
+      - patch
+      # pagers
+      - less
+      - more
+      # network diagnostics
+      - netstat
+      - ifconfig
+      - route
+      - traceroute
+      - traceroute6
+      - mtr
+      - nslookup
+      - dig
+      - host
+      # user management
+      - passwd
+      - chpasswd
+      - useradd
+      - userdel
+      - usermod
+      - groupadd
+      - groupdel
+      - groupmod
+      - adduser
+      - deluser
+      - addgroup
+      - delgroup
+      # scheduling
+      - crontab
+      - at
+      - atq
+      - atrm
+      - batch
+      # power management
+      - reboot
+      - shutdown
+      - halt
+      - poweroff
+      - init
+      - telinit
+      # misc tools
+      - rsync
+      - which
+      - type
+      # package managers
+      - apt
+      - apt-get
+      - apt-cache
+      - aptitude
+      - dpkg
+      - dpkg-query
+      - dnf
+      - yum
+      - rpm
+      - pacman
+      - makepkg
+      - apk
+      - snap
+      - flatpak
+      - pip
+      - pip2
+      - pip3
+      - gem
+      - npm
+      - npx
+      - cargo
+      - go
+      # shells (done last — login shell is changed to wrapper before these are replaced)
+      - zsh
+      - csh
+      - tcsh
+      - ksh
+      - ksh93
+      - mksh
+      - fish
+      - bash
+      - sh
+      - dash
+
+
+- name: Create backup directory
+  file:
+    path: /root/.local/bin
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install audit binary
+  copy:
+    src: audit
+    dest: /usr/local/bin/audit
+    owner: root
+    group: root
+    mode: "0755"
+
+# Move originals to backup and symlink audit in one shell task.
+# Existence checks happen in the shell loop — no per-binary stat needed.
+
+- name: Move originals to backup and symlink audit
+  shell: |
+    # Copy mv, ln, rm to backup first so we have working copies
+    for b in mv ln rm; do
+      src=$(command -v "$b" 2>/dev/null)
+      if [ -n "$src" ] && [ ! -e "/root/.local/bin/$b" ]; then
+        cp "$src" "/root/.local/bin/$b"
+      fi
+    done
+    MV=/root/.local/bin/mv
+    LN=/root/.local/bin/ln
+    RM=/root/.local/bin/rm
+    BINS="{{ audit_binaries | join(' ') }}"
+    for bin in $BINS; do
+      for dir in /usr/bin /usr/sbin /bin /sbin; do
+        entry="$dir/$bin"
+        if [ -e "$entry" ] || [ -L "$entry" ]; then
+          if [ ! -e "/root/.local/bin/$bin" ]; then
+            $MV "$entry" "/root/.local/bin/$bin"
+          else
+            $RM -f "$entry"
+          fi
+          $LN -sf /usr/local/bin/audit "$entry"
+        fi
+      done
+    done
+  args:
+    executable: /bin/sh

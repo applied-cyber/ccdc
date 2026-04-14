@@ -1,0 +1,5 @@
+- name: Windows PHP hardening
+  hosts: windows
+  gather_facts: no
+  roles:
+    - {role: service_windows_php_harden, ignore_errors: yes}

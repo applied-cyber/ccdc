@@ -1,0 +1,72 @@
+- name: Create a temp directory
+  ansible.windows.win_file:
+    path: "{{ windows_temp_dir }}"
+    state: directory
+
+- name: Backup firewall configuration
+  ansible.windows.win_shell: "netsh advfirewall export {{ windows_temp_dir }}\\afterspray.wfw"
+
+- name: Backup the registry
+  ansible.windows.win_shell: "reg export {{ item }} {{ windows_temp_dir }}\\{{ item }}.reg"
+  loop: "{{ REGS }}"
+
+- name: Backup scheduled tasks
+  ansible.windows.win_shell: "xcopy /E /I /Y C:\\Windows\\System32\\Tasks {{ windows_temp_dir }}\\ScheduledTasks"
+  ignore_errors: true
+
+- name: Backup IIS configuration
+  ansible.windows.win_shell: "xcopy /E /I /Y C:\\inetpub {{ windows_temp_dir }}\\inetpub"
+  ignore_errors: true
+
+- name: Backup user directories
+  ansible.windows.win_shell: "xcopy /E /I /Y C:\\Users {{ windows_temp_dir }}\\Users"
+  ignore_errors: true
+
+- name: Retrieve the firewall backup
+  fetch:
+    src: "{{ windows_temp_dir }}\\afterspray.wfw"
+    dest: "{{ host_files }}/{{ inventory_hostname }}/"
+    flat: yes
+
+- name: Retrieve the registry backups
+  fetch:
+    src: "{{ windows_temp_dir }}\\{{ item }}.reg"
+    dest: "{{ host_files }}/{{ inventory_hostname }}/"
+    flat: yes
+  loop: "{{ REGS }}"
+
+- name: Archive scheduled tasks
+  ansible.windows.win_shell: "tar -cf {{ windows_temp_dir }}\\ScheduledTasks.tar -C {{ windows_temp_dir }} ScheduledTasks"
+  ignore_errors: true
+
+- name: Archive IIS configuration
+  ansible.windows.win_shell: "tar -cf {{ windows_temp_dir }}\\inetpub.tar -C {{ windows_temp_dir }} inetpub"
+  ignore_errors: true
+
+- name: Archive user directories
+  ansible.windows.win_shell: "tar -cf {{ windows_temp_dir }}\\Users.tar -C {{ windows_temp_dir }} Users"
+  ignore_errors: true
+
+- name: Retrieve archived backups
+  fetch:
+    src: "{{ windows_temp_dir }}\\{{ item }}"
+    dest: "{{ host_files }}/{{ inventory_hostname }}/"
+    flat: yes
+  loop:
+    - ScheduledTasks.tar
+    - inetpub.tar
+    - Users.tar
+  ignore_errors: true
+
+- name: Clean up temp copies
+  ansible.windows.win_file:
+    path: "{{ windows_temp_dir }}\\{{ item }}"
+    state: absent
+  loop:
+    - ScheduledTasks
+    - ScheduledTasks.tar
+    - inetpub
+    - inetpub.tar
+    - Users
+    - Users.tar
+  ignore_errors: true

@@ -1,0 +1,216 @@
+- name: Ensure linux_root_bin directory exists
+  file:
+    path: "{{ linux_root_bin }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Strip suid bit from all binaries
+  shell: find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /opt /snap /lib /usr/lib $([ ! -L /bin ] && echo /bin) $([ ! -L /sbin ] && echo /sbin) -perm -4000 -exec chmod u-s {} + 2>/dev/null; true
+  ignore_errors: true
+
+- name: Strip all capabilities from binaries
+  shell: >
+    getcap -r /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /opt /snap /lib /usr/lib 2>/dev/null
+    | awk '{print $1}'
+    | xargs -r -n1 setcap -r 2>/dev/null; true
+  ignore_errors: true
+
+- name: Hide binaries in /usr/bin
+  command: "mv /usr/bin/{{ item }} {{ linux_root_bin }}"
+  with_items:
+    - sudo
+    - sudoedit
+    - su
+    - dd
+    - gcc
+    - ld
+    - nc
+    - netcat
+    - lsattr
+    - chattr
+    - mkfifo
+  ignore_errors: true
+
+- name: Hide binarines in /usr/sbin
+  command: "mv /usr/sbin/{{ item }} {{ linux_root_bin }}"
+  with_items:
+    - visudo
+    - cron
+  ignore_errors: true
+
+- name: Disable unprivileged BPF
+  ansible.posix.sysctl:
+    name: kernel.unprivileged_bpf_disabled
+    value: '1'
+
+- name: Disable unprivileged user namespaces (Debian)
+  ansible.posix.sysctl:
+    name: kernel.unprivileged_userns_clone
+    value: '0'
+  when: ansible_os_family == "Debian"
+  ignore_errors: true
+
+- name: Disable unprivileged user namespaces (RHEL/Fedora)
+  ansible.posix.sysctl:
+    name: user.max_user_namespaces
+    value: '0'
+  when: ansible_os_family == "RedHat"
+  ignore_errors: true
+
+- name: Disable io_uring for unprivileged users
+  ansible.posix.sysctl:
+    name: kernel.io_uring_disabled
+    value: '1'
+  ignore_errors: true
+
+- name: Restrict unprivileged nf_tables
+  ansible.posix.sysctl:
+    name: net.netfilter.nf_tables_unprivileged
+    value: '0'
+  ignore_errors: true
+
+- name: Restrict ptrace scope
+  ansible.posix.sysctl:
+    name: kernel.yama.ptrace_scope
+    value: '2'
+  ignore_errors: true
+
+- name: Restrict dmesg to root
+  ansible.posix.sysctl:
+    name: kernel.dmesg_restrict
+    value: '1'
+
+- name: Hide kernel pointers
+  ansible.posix.sysctl:
+    name: kernel.kptr_restrict
+    value: '2'
+
+- name: Protect symlinks in world-writable dirs
+  ansible.posix.sysctl:
+    name: fs.protected_symlinks
+    value: '1'
+
+- name: Protect hardlinks in world-writable dirs
+  ansible.posix.sysctl:
+    name: fs.protected_hardlinks
+    value: '1'
+
+- name: Disable core dumps from suid binaries
+  ansible.posix.sysctl:
+    name: fs.suid_dumpable
+    value: '0'
+
+- name: Disable core dumps via limits
+  lineinfile:
+    path: /etc/security/limits.conf
+    line: "* hard core 0"
+    regexp: '^\*.*hard.*core'
+    state: present
+
+- name: Disable kernel module loading
+  ansible.posix.sysctl:
+    name: kernel.modules_disabled
+    value: '1'
+  ignore_errors: true
+
+- name: Gather service facts
+  service_facts:
+
+- name: Kill cupsd
+  service:
+    name: cups
+    state: stopped
+    enabled: no
+  when: "'cups.service' in ansible_facts.services"
+
+- name: Disable and stop polkit
+  service:
+    name: polkit
+    state: stopped
+    enabled: no
+  when: "'polkit.service' in ansible_facts.services"
+
+- name: Disable and stop snapd
+  service:
+    name: snapd
+    state: stopped
+    enabled: no
+  when: "'snapd.service' in ansible_facts.services"
+
+- name: Remove suid from snap-confine
+  file:
+    path: "{{ item }}"
+    mode: u-s
+  loop:
+    - /usr/lib/snapd/snap-confine
+    - /usr/bin/snap
+  ignore_errors: true
+
+- name: Disable and stop crond
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop:
+    - crond
+    - cron
+  when: "item + '.service' in ansible_facts.services"
+
+- name: Disable and stop atd
+  service:
+    name: atd
+    state: stopped
+    enabled: no
+  when: "'atd.service' in ansible_facts.services"
+
+- name: Clear user crontabs
+  shell: find /var/spool/cron /var/spool/cron/crontabs -type f -delete 2>/dev/null; true
+  changed_when: false
+
+- name: Clear system cron directories
+  shell: find /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly -type f -delete 2>/dev/null; true
+  changed_when: false
+
+- name: Clear at queue
+  shell: find /var/spool/at -type f -delete 2>/dev/null; true
+  changed_when: false
+
+- name: Clear ld.so.preload
+  copy:
+    content: ""
+    dest: /etc/ld.so.preload
+    owner: root
+    group: root
+    mode: '0644'
+  ignore_errors: true
+
+- name: Make ld.so.preload immutable
+  command: chattr +i /etc/ld.so.preload
+  ignore_errors: true
+
+- name: Backup ld.so.conf.d
+  shell: cp -a /etc/ld.so.conf.d /etc/ld.so.conf.d.bak 2>/dev/null; true
+  args:
+    creates: /etc/ld.so.conf.d.bak
+
+- name: Make ld.so.conf immutable
+  command: chattr +i /etc/ld.so.conf
+  ignore_errors: true
+
+- name: Make ld.so.conf.d contents immutable
+  shell: chattr +i /etc/ld.so.conf.d/* 2>/dev/null; chattr +i /etc/ld.so.conf.d; true
+  ignore_errors: true
+
+- name: Backup systemd timer list
+  shell: systemctl list-timers --all --no-pager > /root/systemd_timers_backup.txt 2>/dev/null; true
+  changed_when: false
+
+- name: Disable all non-essential systemd timers
+  shell: |
+    for timer in $(systemctl list-unit-files --type=timer --state=enabled --no-pager --no-legend | awk '{print $1}'); do
+      systemctl stop "$timer" 2>/dev/null
+      systemctl disable "$timer" 2>/dev/null
+    done
+  ignore_errors: true

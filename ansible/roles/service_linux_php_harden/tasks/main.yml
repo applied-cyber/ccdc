@@ -1,0 +1,64 @@
+- name: Gather service facts for PHP hardening
+  service_facts:
+
+- name: Find php.ini files
+  shell: ls /etc/php.ini /etc/php/*/cli/php.ini /etc/php/*/apache2/php.ini /etc/php/*/fpm/php.ini /etc/php/*/cgi/php.ini 2>/dev/null || true
+  register: php_ini_files
+  changed_when: false
+
+- name: Detect web root from Apache config
+  shell: grep -rh '^\s*DocumentRoot' /etc/apache2/ /etc/httpd/ 2>/dev/null | head -1 | sed 's/.*DocumentRoot\s*["]*\([^"]*\)["]*$/\1/' | tr -d ' '
+  register: apache_docroot
+  changed_when: false
+  ignore_errors: true
+
+- name: Detect web root from nginx config
+  shell: grep -rh '^\s*root\s' /etc/nginx/ 2>/dev/null | head -1 | sed 's/.*root\s*\([^;]*\);.*/\1/' | tr -d ' '
+  register: nginx_docroot
+  changed_when: false
+  when: apache_docroot.stdout | default('') | length == 0
+  ignore_errors: true
+
+- name: Set detected web root
+  set_fact:
+    detected_webroot: "{{ apache_docroot.stdout | default('') | trim if apache_docroot.stdout | default('') | trim | length > 0 else nginx_docroot.stdout | default('') | trim }}"
+
+- name: Harden php.ini files
+  blockinfile:
+    path: "{{ item }}"
+    marker: "# {mark} MANAGED BY ANSIBLE - php hardening"
+    block: |
+      expose_php = Off
+      track_errors = Off
+      html_errors = Off
+      file_uploads = Off
+      session.cookie_httponly = 1
+      session.use_only_cookies = 1
+      disable_functions = exec, system, shell_exec, passthru, popen, curl_exec, curl_multi_exec, show_source, proc_open, pcntl_exec, mail, putenv, dl
+      max_execution_time = 3
+      register_globals = off
+      allow_url_fopen = off
+      allow_url_include = off
+      display_errors = off
+      session.cookie_secure = 1
+      ffi.enable = false
+  loop: "{{ php_ini_files.stdout_lines }}"
+  register: php_changed
+  ignore_errors: true
+
+- name: Restart web servers if php.ini changed
+  service:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - apache2
+    - httpd
+    - nginx
+    - php-fpm
+  when: php_changed is changed and item + '.service' in ansible_facts.services
+  ignore_errors: true
+
+- name: Make web root immutable
+  shell: chattr +i -R {{ detected_webroot }}
+  when: detected_webroot | length > 0
+  ignore_errors: true

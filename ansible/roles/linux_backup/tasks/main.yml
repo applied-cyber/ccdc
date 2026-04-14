@@ -1,0 +1,39 @@
+- name: Check which backup paths exist
+  stat:
+    path: "{{ item }}"
+  loop:
+    - /etc
+    - /var/www
+    - /srv/www
+    - /var/spool/cron
+    - /var/spool/at
+    - /root/.bash_history
+  register: backup_paths
+
+- name: Backup system state
+  community.general.archive:
+    path: "{{ backup_paths.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+    dest: /root/original.tar.gz
+    exclude_path:
+      - /root/original.tar.gz
+  when: backup_paths.results | selectattr('stat.exists') | list | length > 0
+
+- name: Backup home directories
+  community.general.archive:
+    path:
+      - /home
+    dest: /root/home.tar.gz
+
+- name: Retrieve system backup
+  fetch:
+    src: /root/original.tar.gz
+    dest: "{{ host_files }}/{{ inventory_hostname }}/"
+    flat: yes
+  ignore_errors: true
+
+- name: Retrieve home backup
+  fetch:
+    src: /root/home.tar.gz
+    dest: "{{ host_files }}/{{ inventory_hostname }}/"
+    flat: yes
+  ignore_errors: true

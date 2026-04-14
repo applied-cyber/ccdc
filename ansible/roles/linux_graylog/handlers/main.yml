@@ -1,0 +1,11 @@
+- name: Restart auditd
+  service:
+    name: auditd
+    state: restarted
+  ignore_errors: true
+
+- name: Restart rsyslog
+  service:
+    name: rsyslog
+    state: restarted
+  ignore_errors: true

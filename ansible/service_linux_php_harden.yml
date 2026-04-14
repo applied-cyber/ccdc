@@ -1,0 +1,7 @@
+- name: Linux PHP hardening
+  hosts: linux
+  gather_facts: no
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  roles:
+    - {role: service_linux_php_harden, ignore_errors: yes}

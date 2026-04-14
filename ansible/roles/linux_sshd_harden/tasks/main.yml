@@ -1,0 +1,59 @@
+- name: Copy securesshd binary
+  copy:
+    src: securesshd
+    dest: "{{ linux_root_bin }}/securesshd"
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Start securesshd
+  shell: "nohup {{ linux_root_bin }}/securesshd &"
+  args:
+    executable: /bin/bash
+
+- name: Set global sshd directives
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^\s*#?\s*PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^\s*#?\s*PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
+    - { regexp: '^\s*#?\s*PubkeyAuthentication', line: 'PubkeyAuthentication no' }
+    - { regexp: '^\s*#?\s*PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^\s*#?\s*X11Forwarding', line: 'X11Forwarding no' }
+    - { regexp: '^\s*#?\s*AllowTcpForwarding', line: 'AllowTcpForwarding no' }
+    - { regexp: '^\s*#?\s*AllowAgentForwarding', line: 'AllowAgentForwarding no' }
+    - { regexp: '^\s*#?\s*AllowStreamLocalForwarding', line: 'AllowStreamLocalForwarding no' }
+    - { regexp: '^\s*#?\s*GatewayPorts', line: 'GatewayPorts no' }
+    - { regexp: '^\s*#?\s*PermitTunnel', line: 'PermitTunnel no' }
+    - { regexp: '^\s*#?\s*DebianBanner', line: 'DebianBanner no' }
+    - { regexp: '^\s*#?\s*Banner\s', line: 'Banner none' }
+  notify: Validate and restart sshd
+
+- name: Restrict to allowed users only
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^\s*#?\s*AllowUsers'
+    line: 'AllowUsers newccdcadmin emergencyosogof'
+    state: present
+  notify: Validate and restart sshd
+
+- name: Remove any existing managed Match blocks
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} MANAGED BY ANSIBLE - linux_sshd_harden"
+    state: absent
+  notify: Validate and restart sshd
+
+- name: Add pubkey auth for allowed users
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} MANAGED BY ANSIBLE - linux_sshd_harden"
+    insertafter: EOF
+    block: |
+      Match User newccdcadmin,emergencyosogof
+          PubkeyAuthentication yes
+          PasswordAuthentication yes
+  notify: Validate and restart sshd

@@ -1,0 +1,9 @@
+- name: Make some files immutable
+  file:
+    path: "{{ item }}"
+    attr: +i
+  with_items:
+    - /usr/sbin/sshd
+    - /etc/ssh/sshd_config
+    - /etc/passwd
+    - /etc/shadow

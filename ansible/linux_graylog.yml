@@ -1,0 +1,19 @@
+- name: Linux Graylog
+  hosts: linux
+  vars_files:
+    - vars/management.yml
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - graylog_ip is defined
+          - graylog_port is defined
+          - organization is defined
+        fail_msg: >
+          Missing required variables. Make sure vars/management.yml is populated.
+          Required: graylog_ip, graylog_port, organization
+      run_once: true
+  roles:
+    - {role: linux_graylog, ignore_errors: yes}

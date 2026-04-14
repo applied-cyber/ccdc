@@ -1,0 +1,12 @@
+- name: Linux Everything Except Cred Rolls and Breakglass
+  hosts: linux
+  vars_files:
+    - vars/management.yml
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  roles:
+    - {role: linux_init_config, ignore_errors: yes}
+    - {role: linux_backup, ignore_errors: yes}
+    - {role: linux_harden, ignore_errors: yes}
+    - {role: linux_graylog, ignore_errors: yes}
+    - {role: linux_immutable, ignore_errors: yes}

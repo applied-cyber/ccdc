@@ -1,0 +1,38 @@
+[package]
+name = "dispel"
+version = "0.1.0"
+edition = "2021"
+description = "Break the enchantment — detect and remove Realm C2 implants"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+colored = "2"
+regex = "1"
+memmap2 = "0.9"
+sha2 = "0.10"
+aho-corasick = "1"
+pnet = "0.35"
+anyhow = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Threading",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
+    "Win32_Foundation",
+    "Win32_System_Registry",
+    "Win32_System_Services",
+    "Win32_NetworkManagement_IpHelper",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+serde_json = "1"

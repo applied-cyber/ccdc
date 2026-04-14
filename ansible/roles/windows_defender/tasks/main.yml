@@ -1,0 +1,196 @@
+- name: Configure Defender
+  ansible.windows.win_regedit:
+    path: "{{ item.path }}"
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: "{{ item.type }}"
+  with_items:
+    # Ensure top-level policy keys don't disable AV
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender"
+      name: DisableAntiSpyware
+      data: 0
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender"
+      name: DisableAntiVirus
+      data: 0
+      type: dword
+
+    # PUA protection
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\MpEngine"
+      name: MpEnablePus
+      data: 1
+      type: dword
+
+    # MAPS reporting level (2 = Advanced)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Spynet"
+      name: SpynetReporting
+      data: 2
+      type: dword
+
+    # Sample submission (0 = always prompt, do not auto-send)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Spynet"
+      name: SubmitSamplesConsent
+      data: 0
+      type: dword
+
+    # Block at first seen 
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Spynet"
+      name: DisableBlockAtFirstSeen
+      data: 0
+      type: dword
+
+    # IPS
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\NIS"
+      name: DisableIntrusionPreventionSystem
+      data: 0
+      type: dword
+
+    # Real-time protection
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection"
+      name: DisableRealtimeMonitoring
+      data: 0
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection"
+      name: DisableBehaviorMonitoring
+      data: 0
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection"
+      name: DisableScriptScanning
+      data: 0
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection"
+      name: DisableIOAVProtection
+      data: 0
+      type: dword
+
+    # Scanning
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Scan"
+      name: DisableArchiveScanning
+      data: 0
+      type: dword
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Scan"
+      name: DisableRemovableDriveScanning
+      data: 0
+      type: dword
+
+    # Network protection 
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\Network Protection"
+      name: EnableNetworkProtection
+      data: 1
+      type: dword
+
+    # ASR rules (1 = block)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: D4F940AB-401B-4EFC-AADC-AD5F3C50688A
+      data: "1"
+      type: string
+    # Block credential stealing from LSASS
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: 9E6C4E1F-7D60-472F-BA1A-A39EF669E4B2
+      data: "1"
+      type: string
+    # Block process creation from PSExec and WMI
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: D1E49AAC-8F56-4280-B9BA-993A6D77406C
+      data: "1"
+      type: string
+    # Block WMI event subscription persistence
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: E6DB77E5-3DF2-4CF1-B95A-636979351E5B
+      data: "1"
+      type: string
+    # Ransomware protection
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: C1DB55AB-C21A-4637-BB3F-A12568109D35
+      data: "1"
+      type: string
+    # Block executable content from email/webmail
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: BE9BA2D9-53EA-4CDC-84E5-9B1EEEE46550
+      data: "1"
+      type: string
+    # Block obfuscated script execution
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: 5BEB7EFE-FD9A-4556-801D-275E5FFC04CC
+      data: "1"
+      type: string
+    # Block untrusted/unsigned processes from USB
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: B2B3F03D-6A65-4F7B-A9C7-1C7EF74A9BA4
+      data: "1"
+      type: string
+    # Block abuse of vulnerable signed drivers (BYOVD)
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: 56A863A9-875E-4185-98A7-B882C64B5CE5
+      data: "1"
+      type: string
+    # Block executables that don't meet prevalence/age criteria
+    - path: "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Windows Defender Exploit Guard\\ASR\\Rules"
+      name: 01443614-CD74-433A-B99E-2ECDC07BFC25
+      data: "1"
+      type: string
+  ignore_errors: true
+
+- name: Clear all Defender exclusions and set C:\CCS as only whitelist
+  ansible.windows.win_shell: |
+    # Clear all existing exclusions via policy registry keys
+    $exclusionKeys = @(
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\Paths',
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\Extensions',
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\Processes',
+      'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\ASROnlyExclusions'
+    )
+    foreach ($key in $exclusionKeys) {
+      if (Test-Path $key) {
+        Remove-Item -Path $key -Force -ErrorAction SilentlyContinue
+      }
+      New-Item -Path $key -Force | Out-Null
+    }
+
+    # Clear MpPreference exclusions
+    Set-MpPreference -ExclusionPath @() -ErrorAction SilentlyContinue
+    Set-MpPreference -ExclusionExtension @() -ErrorAction SilentlyContinue
+    Set-MpPreference -ExclusionProcess @() -ErrorAction SilentlyContinue
+    Set-MpPreference -AttackSurfaceReductionOnlyExclusions @() -ErrorAction SilentlyContinue
+
+    # Add C:\CCS as the only whitelisted path
+    Add-MpPreference -ExclusionPath "C:\CCS"
+    Add-MpPreference -AttackSurfaceReductionOnlyExclusions "C:\CCS"
+
+    # Registry: path exclusion (real-time + scheduled scans)
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Exclusions\Paths' `
+      -Name 'C:\CCS' -Value 0 -PropertyType String -Force | Out-Null
+
+    # Registry: ASR exclusion
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\ASROnlyExclusions' `
+      -Name 'C:\CCS' -Value 0 -PropertyType String -Force | Out-Null
+  ignore_errors: true
+
+- name: Configure Defender preferences
+  ansible.windows.win_shell: |
+    Set-MpPreference -PUAProtection Enabled
+    Set-MpPreference -MAPSReporting Advanced
+    Set-MpPreference -SubmitSamplesConsent 0
+    Set-MpPreference -DisableBehaviorMonitoring $false
+    Set-MpPreference -DisableScriptScanning $false
+    Set-MpPreference -DisableIOAVProtection $false
+    Set-MpPreference -EnableNetworkProtection Enabled
+    Set-MpPreference -DisableArchiveScanning $false
+    Set-MpPreference -DisableRemovableDriveScanning $false
+    Set-MpPreference -DisableBlockAtFirstSeen $false
+    Set-MpPreference -DisableIntrusionPreventionSystem $false
+    Set-MpPreference -DisableRealtimeMonitoring $false
+    $asrRules = @(
+      'D4F940AB-401B-4EFC-AADC-AD5F3C50688A', # Block Office child processes
+      '9E6C4E1F-7D60-472F-BA1A-A39EF669E4B2', # Block LSASS credential stealing
+      'D1E49AAC-8F56-4280-B9BA-993A6D77406C', # Block PSExec/WMI process creation
+      'E6DB77E5-3DF2-4CF1-B95A-636979351E5B', # Block WMI event subscription persistence
+      'C1DB55AB-C21A-4637-BB3F-A12568109D35', # Ransomware protection
+      'BE9BA2D9-53EA-4CDC-84E5-9B1EEEE46550', # Block executable content from email
+      '5BEB7EFE-FD9A-4556-801D-275E5FFC04CC', # Block obfuscated scripts
+      'B2B3F03D-6A65-4F7B-A9C7-1C7EF74A9BA4', # Block untrusted processes from USB
+      '56A863A9-875E-4185-98A7-B882C64B5CE5', # Block BYOVD vulnerable driver abuse
+      '01443614-CD74-433A-B99E-2ECDC07BFC25'  # Block low-prevalence executables
+    )
+    Add-MpPreference -AttackSurfaceReductionRules_Ids $asrRules -AttackSurfaceReductionRules_Actions ($asrRules | ForEach-Object { 'Enabled' })
+  ignore_errors: true

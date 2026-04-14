@@ -1,0 +1,64 @@
+- name: Find php.ini files
+  ansible.windows.win_shell: |
+    $paths = @()
+    $candidates = @(
+      "C:\php",
+      "C:\xampp\php",
+      "C:\wamp\bin\php",
+      "C:\Program Files\PHP",
+      "C:\Program Files (x86)\PHP"
+    )
+    # Check registry for PHP install path
+    $regPath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\PHP" -Name "IniFilePath" -ErrorAction SilentlyContinue).IniFilePath
+    if ($regPath) { $candidates += $regPath }
+    foreach ($dir in $candidates) {
+      $ini = Join-Path $dir "php.ini"
+      if (Test-Path $ini) { $paths += $ini }
+    }
+    $paths -join "`n"
+  register: win_php_ini_files
+  changed_when: false
+  ignore_errors: true
+
+- name: Backup php.ini files
+  ansible.windows.win_copy:
+    src: "{{ item }}"
+    dest: "{{ item }}.bak"
+    remote_src: yes
+  loop: "{{ win_php_ini_files.stdout_lines | default([]) }}"
+  ignore_errors: true
+
+- name: Append PHP hardening to ini files
+  ansible.windows.win_shell: |
+    $lines = @(
+      "expose_php = Off"
+      "track_errors = Off"
+      "html_errors = Off"
+      "file_uploads = Off"
+      "session.cookie_httponly = 1"
+      "session.use_only_cookies = 1"
+      "disable_functions = exec, system, shell_exec, passthru, popen, curl_exec, curl_multi_exec, show_source, proc_open, pcntl_exec, mail, putenv, dl"
+      "max_execution_time = 3"
+      "register_globals = off"
+      "allow_url_fopen = off"
+      "allow_url_include = off"
+      "display_errors = off"
+      "session.cookie_secure = 1"
+      "ffi.enable = false"
+    )
+    Add-Content -Path "{{ item }}" -Value ($lines -join "`r`n")
+  loop: "{{ win_php_ini_files.stdout_lines | default([]) }}"
+  register: win_php_changed
+  ignore_errors: true
+
+- name: Restart web services if php.ini changed
+  ansible.windows.win_shell: |
+    $services = @("Apache2.4", "Apache", "httpd", "nginx", "W3SVC")
+    foreach ($svc in $services) {
+      $s = Get-Service -Name $svc -ErrorAction SilentlyContinue
+      if ($s -and $s.Status -eq 'Running') {
+        Restart-Service -Name $svc -Force -ErrorAction SilentlyContinue
+      }
+    }
+  when: win_php_changed is changed
+  ignore_errors: true

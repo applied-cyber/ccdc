@@ -1,0 +1,9 @@
+- name: Validate and restart sshd
+  command: sshd -t
+  changed_when: false
+  notify: Restart sshd
+
+- name: Restart sshd
+  service:
+    name: sshd
+    state: restarted

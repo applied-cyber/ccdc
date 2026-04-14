@@ -1,0 +1,46 @@
+- name: Harden sshd on non-scored SSH hosts
+  hosts: linux:bsd
+  gather_facts: no
+  vars_files:
+    - vars/management.yml
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  pre_tasks:
+    - name: Validate scored_ports is defined
+      assert:
+        that:
+          - scored_ports is defined
+        fail_msg: >
+          scored_ports is not defined for {{ inventory_hostname }}.
+          Add scored_ports=22,80,... to the host line in your inventory.
+      ignore_errors: no
+
+    - name: Validate SSH is NOT scored on this host
+      assert:
+        that:
+          - "'22' not in scored_ports.split(',')"
+        fail_msg: >
+          Port 22 is scored on {{ inventory_hostname }}.
+          This playbook is for non-scored SSH hosts only.
+          Use service_ssh_secure_shell.yml for scored SSH hosts.
+      ignore_errors: no
+
+    - name: Check securesshd binary exists
+      stat:
+        path: "{{ playbook_dir }}/roles/linux_sshd_harden/files/securesshd"
+      register: securesshd_binary
+      delegate_to: localhost
+      run_once: true
+
+    - name: Fail if securesshd binary is missing
+      assert:
+        that:
+          - securesshd_binary.stat.exists
+        fail_msg: >
+          securesshd binary not found at roles/linux_sshd_harden/files/securesshd.
+          Place the binary there before running this playbook.
+      ignore_errors: no
+      run_once: true
+
+  roles:
+    - linux_sshd_harden

@@ -1,0 +1,6 @@
+- name: Windows Security Updates
+  hosts: windows
+  vars_files:
+    - vars/management.yml
+  roles:
+    - {role: windows_update, ignore_errors: yes}

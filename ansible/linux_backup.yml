@@ -1,0 +1,17 @@
+- name: Linux backup
+  hosts: linux
+  vars_files:
+    - vars/management.yml
+  environment:
+    PATH: "{{ ansible_task_path }}"
+  pre_tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - host_files is defined
+        fail_msg: >
+          Missing required variable. Make sure vars/management.yml is populated.
+          Required: host_files
+      run_once: true
+  roles:
+    - {role: linux_backup, ignore_errors: yes}

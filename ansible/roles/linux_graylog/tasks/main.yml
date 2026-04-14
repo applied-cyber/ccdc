@@ -1,0 +1,73 @@
+- name: Install rsyslog and auditd
+  package:
+    name: "{{ item }}"
+  with_items:
+    - rsyslog
+    - "{% if ansible_os_family == 'Debian' %} auditd {% else %} audit {% endif %}"
+
+- name: Satisfy SELinux on RedHat distros
+  shell: |
+    semanage port -a -t syslogd_port_t -p tcp {{ graylog_port }}
+    semanage fcontext -a -t var_log_t '/var/log/audit(/.*log)?'
+    semanage permissive -a syslogd_t
+  when: ansible_os_family == 'RedHat'
+
+- name: Allow us to restart auditd manually
+  lineinfile:
+    line: "RefuseManualStop=no"
+    path: "/usr/lib/systemd/system/auditd.service"
+    regexp: "^RefuseManualStop="
+    state: present
+    create: no
+
+- name: Reload systemd unit files
+  systemd:
+    daemon_reload: yes
+
+- name: Configure auditd to log all shell commands
+  blockinfile:
+    block: |
+      -a exit,always -F arch=b64 -S execve
+      -a exit,always -F arch=b32 -S execve
+    path: "{{ item }}"
+    create: true
+  with_items:
+    - "/etc/audit/rules.d/audit.rules"
+    - "/etc/audit/audit.rules"
+  notify: Restart auditd
+
+- name: Delete audit rule blocking syscall logging
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^(-a task,never)'
+    line: '#\1'
+  with_items:
+    - /etc/audit/audit.rules
+    - /etc/audit/rules.d/audit.rules
+  notify: Restart auditd
+
+- name: Don't send emergencies to all ttys
+  lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^(\*\.emerg.*)'
+    line: '#\1'
+
+- name: Collect audit logs via rsyslog
+  blockinfile:
+    block: |
+      $ModLoad imfile
+      $InputFileName /var/log/audit/audit.log
+      $InputFileTag tag_audit_log:
+      $InputFileStateFile audit_log
+      $InputFileSeverity info
+      $InputFileFacility local6
+      $InputRunFileMonitor
+    path: "/etc/rsyslog.conf"
+    create: true
+  notify: Restart rsyslog
+
+- name: Configure rsyslog to send logs to graylog installation
+  template:
+    src: 50-graylog.conf.j2
+    dest: /etc/rsyslog.d/50-graylog.conf
+  notify: Restart rsyslog

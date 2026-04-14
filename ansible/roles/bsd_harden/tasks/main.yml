@@ -1,0 +1,62 @@
+- name: Strip suid bit from binaries
+  shell: find /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -perm -4000 -exec chmod u-s {} + 2>/dev/null; true
+  ignore_errors: true
+
+- name: Hide dangerous binaries
+  command: "mv /usr/bin/{{ item }} {{ linux_root_bin }}"
+  with_items:
+    - su
+    - dd
+    - gcc
+    - ld
+    - nc
+    - netcat
+  ignore_errors: true
+
+- name: Hide sbin binaries
+  command: "mv /usr/sbin/{{ item }} {{ linux_root_bin }}"
+  with_items:
+    - cron
+  ignore_errors: true
+
+- name: Set securelevel to 1
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^\s*#?\s*kern\.securelevel'
+    line: 'kern.securelevel=1'
+    state: present
+
+- name: Apply securelevel
+  command: sysctl kern.securelevel=1
+  ignore_errors: true
+
+- name: Disable unnecessary services in rc.conf
+  lineinfile:
+    path: /etc/rc.conf
+    regexp: '^\s*#?\s*{{ item }}_enable'
+    line: '{{ item }}_enable="NO"'
+    state: present
+  loop:
+    - inetd
+    - sendmail
+    - lpd
+    - nfs_server
+    - nfs_client
+    - rpcbind
+    - sshd_oomprotect
+  ignore_errors: true
+
+- name: Backup crontabs
+  copy:
+    src: /var/cron/tabs
+    dest: /var/cron/tabs.bak
+    remote_src: yes
+  ignore_errors: true
+
+- name: Clear user crontabs
+  shell: find /var/cron/tabs -type f -delete 2>/dev/null; true
+  changed_when: false
+
+- name: Make sshd binary immutable
+  command: chflags schg /usr/sbin/sshd
+  ignore_errors: true

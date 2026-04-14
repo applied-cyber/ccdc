@@ -1,0 +1,5 @@
+- name: Install all security updates and reboot
+  ansible.windows.win_updates:
+    category_names:
+    - SecurityUpdates
+    reboot: yes

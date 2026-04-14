@@ -1,0 +1,7 @@
+- name: Windows Harden
+  hosts: windows
+  gather_facts: no
+  vars_files:
+    - vars/management.yml
+  roles:
+    - {role: windows_harden, ignore_errors: yes}
